@@ -26,7 +26,9 @@ jobs:
 
       - name: Create deploy archive
         run: |
-          tar -czf release.tar.gz --exclude=node_modules --exclude=.git .
+          mkdir package
+          cp -r * package
+          tar -czf release.tar.gz -C package .
 
       - name: Copy files to EC2 (SCP)
         uses: appleboy/scp-action@master
