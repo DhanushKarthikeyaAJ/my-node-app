@@ -26,10 +26,16 @@ jobs:
 
       - name: Create deploy archive
         run: |
+          rm -rf package
           mkdir package
-          cp -r * package
+          shopt -s dotglob
+          for item in *; do
+            if [[ "$item" != "package" ]]; then
+              cp -r "$item" package/
+            fi
+          done
           tar -czf release.tar.gz -C package .
-
+      
       - name: Copy files to EC2 (SCP)
         uses: appleboy/scp-action@master
         with:
