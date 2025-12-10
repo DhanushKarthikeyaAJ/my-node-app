@@ -19,7 +19,7 @@ jobs:
           node-version: '18'
 
       - name: Install deps
-        run: npm ci
+        run: npm install
 
       - name: Run tests
         run: npm test
@@ -54,7 +54,7 @@ jobs:
             rm -f release.tar.gz
             
             # install production dependencies
-            npm ci --only=production
+            npm install --production
             
             # ensure pm2 is present
             if ! command -v pm2 >/dev/null 2>&1; then
