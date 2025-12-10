@@ -1,0 +1,63 @@
+name: CI/CD → EC2
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    environment: production
+
+    steps:
+    - name: Checkout
+      uses: actions/checkout@v4
+
+    - name: Use Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: '18'
+
+    - name: Install deps
+      run: npm ci
+
+    - name: Run tests
+      run: npm test
+
+    - name: Create deploy archive
+      run: |
+        tar -czf release.tar.gz --exclude=node_modules --exclude=.git .
+
+    - name: Copy files to EC2 (SCP)
+      uses: appleboy/scp-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.SSH_PORT || '22' }}
+        source: "release.tar.gz"
+        target: "${{ secrets.APP_PATH }}"
+
+    - name: Remote: extract, install and restart (SSH)
+      uses: appleboy/ssh-action@master
+      with:
+        host: ${{ secrets.SSH_HOST }}
+        username: ${{ secrets.SSH_USER }}
+        key: ${{ secrets.SSH_PRIVATE_KEY }}
+        port: ${{ secrets.SSH_PORT || '22' }}
+        script: |
+          set -e
+          cd ${{ secrets.APP_PATH }}
+          # extract and overwrite
+          tar -xzf release.tar.gz -C ${{ secrets.APP_PATH }}
+          rm -f release.tar.gz
+          # install production dependencies
+          npm ci --only=production
+          # ensure pm2 is present
+          if ! command -v pm2 >/dev/null 2>&1; then
+            sudo npm install -g pm2
+          fi
+          # restart with PM2
+          pm2 start ecosystem.config.js --update-env --env production || pm2 reload ecosystem.config.js --env production || pm2 restart ecosystem.config.js --env production
+          # save pm2 process list to resurrect after reboot
+          pm2 save
